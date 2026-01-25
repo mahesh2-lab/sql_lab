@@ -9,7 +9,7 @@ import { ExerciseList } from "@/components/ExerciseList";
 import { ResultTable } from "@/components/ResultTable";
 import { SchemaViewer } from "@/components/SchemaViewer";
 import Editor from "@monaco-editor/react";
-import { Play, Check, RotateCcw, ChevronLeft, ChevronRight, Lightbulb, PartyPopper } from "lucide-react";
+import { Play, Check, RotateCcw, ChevronLeft, ChevronRight, Lightbulb, PartyPopper, Database } from "lucide-react";
 import confetti from "canvas-confetti";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,7 @@ export default function Lab() {
   const [match, params] = useRoute("/exercise/:id");
   const [, setLocation] = useLocation();
   const exerciseId = params?.id ? parseInt(params.id) : undefined;
-  
+
   const { data: exercises, isLoading: loadingList } = useExercises();
   const { data: exercise, isLoading: loadingExercise } = useExercise(exerciseId || 0);
   const { progress, isLoading: loadingProgress, markCompleted, setLastActive } = useProgress();
@@ -34,11 +34,11 @@ export default function Lab() {
 
   // Redirect to last active or first exercise if none selected
   useEffect(() => {
-    if (!match && !loadingList && !loadingProgress && exercises?.length) {
+    if (!match && !loadingList && !loadingExercise && exercises?.length) {
       const target = progress.lastActiveExerciseId || exercises[0].id;
       setLocation(`/exercise/${target}`);
     }
-  }, [match, exercises, loadingList, loadingProgress, progress.lastActiveExerciseId, setLocation]);
+  }, [match, exercises, loadingList, loadingExercise, progress.lastActiveExerciseId, setLocation]);
 
   // Setup DB when exercise changes
   useEffect(() => {
@@ -73,15 +73,15 @@ export default function Lab() {
 
     // 2. Run solution query (hidden)
     const solutionRes = await executeQuery(exercise.solutionSql);
-    
+
     // 3. Compare
     const userJSON = JSON.stringify(userRes.rows);
     const solutionJSON = JSON.stringify(solutionRes.rows);
-    
+
     const passed = userJSON === solutionJSON;
 
     setResult({ ...userRes, error: passed ? undefined : "Incorrect result. Try again!" });
-    
+
     if (passed) {
       setIsSuccess(true);
       markCompleted(exercise.id);
@@ -105,7 +105,10 @@ export default function Lab() {
     }
   };
 
-  if (loadingList || loadingDB || loadingProgress) {
+  console.log(loadingList, loadingDB, loadingProgress);
+
+
+  if (loadingList || loadingDB) {
     return (
       <div className="h-screen w-full bg-background flex flex-col items-center justify-center gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -126,7 +129,7 @@ export default function Lab() {
           </div>
           <h1 className="font-display font-bold text-lg hidden md:block">Postgres Lab</h1>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <div className="text-xs text-muted-foreground mr-4 hidden sm:block">
             {progress.completedExerciseIds.length} / {exercises.length} Completed
@@ -139,7 +142,7 @@ export default function Lab() {
 
       <div className="flex-1 flex overflow-hidden">
         <ResizablePanelGroup direction="horizontal">
-          
+
           {/* Sidebar */}
           <ResizablePanel defaultSize={20} minSize={15} maxSize={30} className="hidden md:block bg-muted/10 border-r border-border">
             <div className="h-full flex flex-col">
@@ -147,27 +150,27 @@ export default function Lab() {
                 <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Curriculum</h2>
               </div>
               <ScrollAreaWrapper>
-                <ExerciseList 
-                  exercises={exercises} 
-                  completedIds={progress.completedExerciseIds} 
-                  currentId={exerciseId} 
+                <ExerciseList
+                  exercises={exercises}
+                  completedIds={progress.completedExerciseIds}
+                  currentId={exerciseId}
                 />
               </ScrollAreaWrapper>
             </div>
           </ResizablePanel>
-          
+
           <ResizableHandle className="hidden md:flex" />
 
           {/* Main Content */}
           <ResizablePanel defaultSize={80}>
             {loadingExercise || !exercise ? (
-               <div className="h-full w-full p-8 space-y-4">
-                 <Skeleton className="h-12 w-3/4" />
-                 <Skeleton className="h-64 w-full" />
-               </div>
+              <div className="h-full w-full p-8 space-y-4">
+                <Skeleton className="h-12 w-3/4" />
+                <Skeleton className="h-64 w-full" />
+              </div>
             ) : (
               <ResizablePanelGroup direction="horizontal">
-                
+
                 {/* Exercise Description & Schema */}
                 <ResizablePanel defaultSize={40} minSize={30}>
                   <ScrollAreaWrapper className="bg-card/30">
@@ -189,9 +192,9 @@ export default function Lab() {
 
                       {exercise.hint && (
                         <div className="pt-4 border-t border-border">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setShowHint(!showHint)}
                             className="text-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
                           >
@@ -200,7 +203,7 @@ export default function Lab() {
                           </Button>
                           <AnimatePresence>
                             {showHint && (
-                              <motion.div 
+                              <motion.div
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: "auto", opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
@@ -227,21 +230,21 @@ export default function Lab() {
                 {/* Editor & Results */}
                 <ResizablePanel defaultSize={60}>
                   <ResizablePanelGroup direction="vertical">
-                    
+
                     {/* Code Editor */}
                     <ResizablePanel defaultSize={60} minSize={30}>
                       <div className="h-full flex flex-col bg-[#1e1e1e]">
                         <div className="h-10 bg-muted/20 border-b border-border flex items-center justify-between px-4 shrink-0">
                           <span className="text-xs font-mono text-muted-foreground flex items-center gap-2">
-                             query.sql
+                            query.sql
                           </span>
                           <div className="flex items-center gap-2">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost" 
-                                  className="h-7 w-7 p-0" 
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0"
                                   onClick={() => setCode("-- Write your SQL query here\n")}
                                 >
                                   <RotateCcw className="w-3.5 h-3.5" />
@@ -269,26 +272,26 @@ export default function Lab() {
                           />
                         </div>
                         <div className="h-14 border-t border-border bg-card p-2 flex items-center justify-end gap-2 px-4">
-                           <Button 
-                             variant="secondary" 
-                             size="sm" 
-                             onClick={handleRun}
-                             disabled={isRunning}
-                           >
-                             <Play className="w-4 h-4 mr-2 text-muted-foreground" /> Run
-                           </Button>
-                           <Button 
-                             onClick={handleSubmit}
-                             disabled={isRunning}
-                             className="bg-primary hover:bg-primary/90 text-white shadow-[0_0_20px_rgba(124,58,237,0.3)]"
-                           >
-                             {isRunning ? (
-                               <span className="animate-spin mr-2">⏳</span>
-                             ) : (
-                               <Check className="w-4 h-4 mr-2" />
-                             )}
-                             Submit
-                           </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleRun}
+                            disabled={isRunning}
+                          >
+                            <Play className="w-4 h-4 mr-2 text-muted-foreground" /> Run
+                          </Button>
+                          <Button
+                            onClick={handleSubmit}
+                            disabled={isRunning}
+                            className="bg-primary hover:bg-primary/90 text-white shadow-[0_0_20px_rgba(124,58,237,0.3)]"
+                          >
+                            {isRunning ? (
+                              <span className="animate-spin mr-2">⏳</span>
+                            ) : (
+                              <Check className="w-4 h-4 mr-2" />
+                            )}
+                            Submit
+                          </Button>
                         </div>
                       </div>
                     </ResizablePanel>
@@ -302,51 +305,51 @@ export default function Lab() {
                           <span>Results</span>
                           {result?.rows && <span className="font-mono">{result.rows.length} rows</span>}
                         </div>
-                        
-                        <div className="flex-1 overflow-hidden relative">
-                           {/* Success Overlay */}
-                           <AnimatePresence>
-                             {isSuccess && (
-                               <motion.div 
-                                 initial={{ opacity: 0 }}
-                                 animate={{ opacity: 1 }}
-                                 exit={{ opacity: 0 }}
-                                 className="absolute inset-0 z-20 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6"
-                               >
-                                 <motion.div
-                                   initial={{ scale: 0.8, y: 20 }}
-                                   animate={{ scale: 1, y: 0 }}
-                                   className="bg-card border border-border p-8 rounded-2xl shadow-2xl max-w-md w-full"
-                                 >
-                                   <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500">
-                                     <PartyPopper className="w-8 h-8" />
-                                   </div>
-                                   <h3 className="text-2xl font-bold text-foreground mb-2">Great Job!</h3>
-                                   <p className="text-muted-foreground mb-6">You've solved this query correctly.</p>
-                                   <div className="flex justify-center gap-3">
-                                     <Button variant="outline" onClick={() => setIsSuccess(false)}>Stay Here</Button>
-                                     <Button onClick={handleNext} className="gap-2">
-                                       Next Exercise <ChevronRight className="w-4 h-4" />
-                                     </Button>
-                                   </div>
-                                 </motion.div>
-                               </motion.div>
-                             )}
-                           </AnimatePresence>
 
-                           {result ? (
-                             <ResultTable 
-                               columns={result.columns} 
-                               rows={result.rows} 
-                               error={result.error} 
-                               affectedRows={result.affectedRows}
-                             />
-                           ) : (
-                             <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-2">
-                               <Database className="w-8 h-8 opacity-20" />
-                               <span className="text-sm">Run your query to see results here</span>
-                             </div>
-                           )}
+                        <div className="flex-1 overflow-hidden relative">
+                          {/* Success Overlay */}
+                          <AnimatePresence>
+                            {isSuccess && (
+                              <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 z-20 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6"
+                              >
+                                <motion.div
+                                  initial={{ scale: 0.8, y: 20 }}
+                                  animate={{ scale: 1, y: 0 }}
+                                  className="bg-card border border-border p-8 rounded-2xl shadow-2xl max-w-md w-full"
+                                >
+                                  <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500">
+                                    <PartyPopper className="w-8 h-8" />
+                                  </div>
+                                  <h3 className="text-2xl font-bold text-foreground mb-2">Great Job!</h3>
+                                  <p className="text-muted-foreground mb-6">You've solved this query correctly.</p>
+                                  <div className="flex justify-center gap-3">
+                                    <Button variant="outline" onClick={() => setIsSuccess(false)}>Stay Here</Button>
+                                    <Button onClick={handleNext} className="gap-2">
+                                      Next Exercise <ChevronRight className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </motion.div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+
+                          {result ? (
+                            <ResultTable
+                              columns={result.columns}
+                              rows={result.rows}
+                              error={result.error}
+                              affectedRows={result.affectedRows}
+                            />
+                          ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-2">
+                              <Database className="w-8 h-8 opacity-20" />
+                              <span className="text-sm">Run your query to see results here</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </ResizablePanel>

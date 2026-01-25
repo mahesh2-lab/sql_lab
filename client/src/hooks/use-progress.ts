@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { openDB } from "idb";
 
 const DB_NAME = "sql-lab-progress";
@@ -35,7 +35,7 @@ export function useProgress() {
     loadProgress();
   }, []);
 
-  const markCompleted = async (exerciseId: number) => {
+  const markCompleted = useCallback(async (exerciseId: number) => {
     if (progress.completedExerciseIds.includes(exerciseId)) return;
 
     const newProgress = {
@@ -47,14 +47,16 @@ export function useProgress() {
 
     const db = await openDB(DB_NAME, 1);
     await db.put(STORE_NAME, newProgress, "main");
-  };
+  }, [progress]);
 
-  const setLastActive = async (exerciseId: number) => {
+  const setLastActive = useCallback(async (exerciseId: number) => {
+    if (progress.lastActiveExerciseId === exerciseId) return;
+
     const newProgress = { ...progress, lastActiveExerciseId: exerciseId };
     setProgress(newProgress);
     const db = await openDB(DB_NAME, 1);
     await db.put(STORE_NAME, newProgress, "main");
-  };
+  }, [progress]);
 
   return { progress, isLoading, markCompleted, setLastActive };
 }

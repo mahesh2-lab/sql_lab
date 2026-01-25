@@ -17,13 +17,21 @@ export function usePGlite() {
     let mounted = true;
 
     async function initDB() {
+      console.log("initDB");
+
       try {
+        console.log("intializing the db ");
+
         const pg = await PGlite.create();
+        console.log("pg", pg);
+
         if (mounted) {
           setDb(pg);
           setIsLoading(false);
         }
       } catch (err) {
+        console.log("error", err);
+
         if (mounted) {
           setError(err instanceof Error ? err.message : "Failed to initialize PGlite");
           setIsLoading(false);
@@ -40,13 +48,23 @@ export function usePGlite() {
   }, []);
 
   const executeQuery = useCallback(async (sql: string): Promise<QueryResult> => {
+    console.log("db", db);
+
     if (!db) return { columns: [], rows: [], error: "Database not initialized" };
 
     try {
       const start = performance.now();
-      const res = await db.query(sql);
+      const results = await db.exec(sql);
       const end = performance.now();
       console.log(`Query executed in ${(end - start).toFixed(2)}ms`);
+
+      // Return the result of the last statement if strictly results are returned,
+      // usually the user cares about the output of their last query.
+      const res = results[results.length - 1];
+
+      if (!res) {
+        return { columns: [], rows: [], affectedRows: 0 };
+      }
 
       return {
         columns: res.fields.map((f) => f.name),
@@ -66,7 +84,7 @@ export function usePGlite() {
     if (!db) return;
     try {
       // Basic reset strategy: Drop public schema and recreate
-      await db.query(`
+      await db.exec(`
         DROP SCHEMA public CASCADE;
         CREATE SCHEMA public;
         GRANT ALL ON SCHEMA public TO postgres;
