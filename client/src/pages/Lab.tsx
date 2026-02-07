@@ -1,19 +1,37 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useExercises, useExercise } from "@/hooks/use-exercises";
 import { usePGlite } from "@/hooks/use-pglite";
 import { useProgress } from "@/hooks/use-progress";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import type { editor } from "monaco-editor";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { ExerciseList } from "@/components/ExerciseList";
 import { ResultTable } from "@/components/ResultTable";
 import { SchemaViewer } from "@/components/SchemaViewer";
 import Editor from "@monaco-editor/react";
-import { Play, Check, RotateCcw, ChevronLeft, ChevronRight, Lightbulb, PartyPopper, Database } from "lucide-react";
+import {
+  Play,
+  Check,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  Lightbulb,
+  PartyPopper,
+  Database,
+} from "lucide-react";
 import confetti from "canvas-confetti";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Lab() {
@@ -22,12 +40,24 @@ export default function Lab() {
   const exerciseId = params?.id ? parseInt(params.id) : undefined;
 
   const { data: exercises, isLoading: loadingList } = useExercises();
-  const { data: exercise, isLoading: loadingExercise } = useExercise(exerciseId || 0);
-  const { progress, isLoading: loadingProgress, markCompleted, setLastActive } = useProgress();
+  const { data: exercise, isLoading: loadingExercise } = useExercise(
+    exerciseId || 0,
+  );
+  const {
+    progress,
+    isLoading: loadingProgress,
+    markCompleted,
+    setLastActive,
+  } = useProgress();
   const { db, executeQuery, resetDB, isLoading: loadingDB } = usePGlite();
 
-  const [code, setCode] = useState("-- Write your SQL query here\nSELECT * FROM users LIMIT 5;");
-  const [result, setResult] = useState<{ columns: string[], rows: any[][], error?: string, affectedRows?: number } | null>(null);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const [result, setResult] = useState<{
+    columns: string[];
+    rows: any[][];
+    error?: string;
+    affectedRows?: number;
+  } | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showHint, setShowHint] = useState(false);
@@ -38,7 +68,14 @@ export default function Lab() {
       const target = progress.lastActiveExerciseId || exercises[0].id;
       setLocation(`/exercise/${target}`);
     }
-  }, [match, exercises, loadingList, loadingExercise, progress.lastActiveExerciseId, setLocation]);
+  }, [
+    match,
+    exercises,
+    loadingList,
+    loadingExercise,
+    progress.lastActiveExerciseId,
+    setLocation,
+  ]);
 
   // Setup DB when exercise changes
   useEffect(() => {
@@ -47,14 +84,29 @@ export default function Lab() {
       setLastActive(exercise.id);
       setIsSuccess(false);
       setResult(null);
-      setCode("-- Write your SQL query here\n");
+      editorRef.current?.setValue("-- Write your SQL query here\n");
       setShowHint(false);
     }
   }, [exercise, db, resetDB, setLastActive]);
 
+  const handleEditorMount = useCallback(
+    (editor: editor.IStandaloneCodeEditor) => {
+      editorRef.current = editor;
+    },
+    [],
+  );
+
+  const getCode = useCallback(() => {
+    return editorRef.current?.getValue() || "";
+  }, []);
+
+  const resetCode = useCallback(() => {
+    editorRef.current?.setValue("-- Write your SQL  here\n");
+  }, []);
+
   const handleRun = async () => {
     setIsRunning(true);
-    const res = await executeQuery(code);
+    const res = await executeQuery(getCode());
     setResult(res);
     setIsRunning(false);
   };
@@ -64,7 +116,7 @@ export default function Lab() {
     setIsRunning(true);
 
     // 1. Run user query
-    const userRes = await executeQuery(code);
+    const userRes = await executeQuery(getCode());
     if (userRes.error) {
       setResult(userRes);
       setIsRunning(false);
@@ -80,7 +132,10 @@ export default function Lab() {
 
     const passed = userJSON === solutionJSON;
 
-    setResult({ ...userRes, error: passed ? undefined : "Incorrect result. Try again!" });
+    setResult({
+      ...userRes,
+      error: passed ? undefined : "Incorrect result. Try again!",
+    });
 
     if (passed) {
       setIsSuccess(true);
@@ -88,7 +143,7 @@ export default function Lab() {
       confetti({
         particleCount: 100,
         spread: 70,
-        origin: { y: 0.6 }
+        origin: { y: 0.6 },
       });
     }
 
@@ -98,7 +153,7 @@ export default function Lab() {
   const handleNext = () => {
     if (!exercises || !exercise) return;
     const sorted = [...exercises].sort((a, b) => a.order - b.order);
-    const currentIndex = sorted.findIndex(e => e.id === exercise.id);
+    const currentIndex = sorted.findIndex((e) => e.id === exercise.id);
     const next = sorted[currentIndex + 1];
     if (next) {
       setLocation(`/exercise/${next.id}`);
@@ -107,12 +162,13 @@ export default function Lab() {
 
   console.log(loadingList, loadingDB, loadingProgress);
 
-
   if (loadingList || loadingDB) {
     return (
       <div className="h-screen w-full bg-background flex flex-col items-center justify-center gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <p className="text-muted-foreground font-mono animate-pulse">Initializing SQL Engine...</p>
+        <p className="text-muted-foreground font-mono animate-pulse">
+          Initializing SQL Engine...
+        </p>
       </div>
     );
   }
@@ -127,12 +183,15 @@ export default function Lab() {
           <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center text-primary font-bold font-display text-lg">
             SQL
           </div>
-          <h1 className="font-display font-bold text-lg hidden md:block">Postgres Lab</h1>
+          <h1 className="font-display font-bold text-lg hidden md:block">
+            Postgres Lab
+          </h1>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="text-xs text-muted-foreground mr-4 hidden sm:block">
-            {progress.completedExerciseIds.length} / {exercises.length} Completed
+            {progress.completedExerciseIds.length} / {exercises.length}{" "}
+            Completed
           </div>
           <Button variant="outline" size="sm" onClick={() => setLocation("/")}>
             All Exercises
@@ -142,12 +201,18 @@ export default function Lab() {
 
       <div className="flex-1 flex overflow-hidden">
         <ResizablePanelGroup direction="horizontal">
-
           {/* Sidebar */}
-          <ResizablePanel defaultSize={20} minSize={15} maxSize={30} className="hidden md:block bg-muted/10 border-r border-border">
+          <ResizablePanel
+            defaultSize={20}
+            minSize={15}
+            maxSize={30}
+            className="hidden md:block bg-muted/10 border-r border-border"
+          >
             <div className="h-full flex flex-col">
               <div className="p-4 border-b border-border bg-card/50">
-                <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Curriculum</h2>
+                <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
+                  Curriculum
+                </h2>
               </div>
               <ScrollAreaWrapper>
                 <ExerciseList
@@ -170,21 +235,32 @@ export default function Lab() {
               </div>
             ) : (
               <ResizablePanelGroup direction="horizontal">
-
                 {/* Exercise Description & Schema */}
                 <ResizablePanel defaultSize={40} minSize={30}>
                   <ScrollAreaWrapper className="bg-card/30">
                     <div className="p-6 max-w-2xl mx-auto space-y-8">
                       <div>
                         <div className="flex items-center gap-3 mb-4">
-                          <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary font-mono">
+                          <Badge
+                            variant="outline"
+                            className="bg-primary/5 border-primary/20 text-primary font-mono"
+                          >
                             Exercise {exercise.order}
                           </Badge>
-                          {progress.completedExerciseIds.includes(exercise.id) && (
-                            <Badge variant="default" className="bg-green-600 hover:bg-green-700">Completed</Badge>
+                          {progress.completedExerciseIds.includes(
+                            exercise.id,
+                          ) && (
+                            <Badge
+                              variant="default"
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              Completed
+                            </Badge>
                           )}
                         </div>
-                        <h1 className="text-3xl font-display font-bold mb-4 text-foreground">{exercise.title}</h1>
+                        <h1 className="text-3xl font-display font-bold mb-4 text-foreground">
+                          {exercise.title}
+                        </h1>
                         <div className="prose prose-invert prose-sm max-w-none text-muted-foreground">
                           <p>{exercise.description}</p>
                         </div>
@@ -230,7 +306,6 @@ export default function Lab() {
                 {/* Editor & Results */}
                 <ResizablePanel defaultSize={60}>
                   <ResizablePanelGroup direction="vertical">
-
                     {/* Code Editor */}
                     <ResizablePanel defaultSize={60} minSize={30}>
                       <div className="h-full flex flex-col bg-[#1e1e1e]">
@@ -245,7 +320,7 @@ export default function Lab() {
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 w-7 p-0"
-                                  onClick={() => setCode("-- Write your SQL query here\n")}
+                                  onClick={resetCode}
                                 >
                                   <RotateCcw className="w-3.5 h-3.5" />
                                 </Button>
@@ -259,8 +334,8 @@ export default function Lab() {
                             height="100%"
                             defaultLanguage="sql"
                             theme="vs-dark"
-                            value={code}
-                            onChange={(val) => setCode(val || "")}
+                            defaultValue="-- Write your SQL query here\n"
+                            onMount={handleEditorMount}
                             options={{
                               minimap: { enabled: false },
                               fontSize: 14,
@@ -278,7 +353,8 @@ export default function Lab() {
                             onClick={handleRun}
                             disabled={isRunning}
                           >
-                            <Play className="w-4 h-4 mr-2 text-muted-foreground" /> Run
+                            <Play className="w-4 h-4 mr-2 text-muted-foreground" />{" "}
+                            Run
                           </Button>
                           <Button
                             onClick={handleSubmit}
@@ -303,7 +379,11 @@ export default function Lab() {
                       <div className="h-full flex flex-col bg-background relative">
                         <div className="h-9 border-b border-border bg-muted/30 flex items-center px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0 justify-between">
                           <span>Results</span>
-                          {result?.rows && <span className="font-mono">{result.rows.length} rows</span>}
+                          {result?.rows && (
+                            <span className="font-mono">
+                              {result.rows.length} rows
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex-1 overflow-hidden relative">
@@ -324,12 +404,25 @@ export default function Lab() {
                                   <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500">
                                     <PartyPopper className="w-8 h-8" />
                                   </div>
-                                  <h3 className="text-2xl font-bold text-foreground mb-2">Great Job!</h3>
-                                  <p className="text-muted-foreground mb-6">You've solved this query correctly.</p>
+                                  <h3 className="text-2xl font-bold text-foreground mb-2">
+                                    Great Job!
+                                  </h3>
+                                  <p className="text-muted-foreground mb-6">
+                                    You've solved this query correctly.
+                                  </p>
                                   <div className="flex justify-center gap-3">
-                                    <Button variant="outline" onClick={() => setIsSuccess(false)}>Stay Here</Button>
-                                    <Button onClick={handleNext} className="gap-2">
-                                      Next Exercise <ChevronRight className="w-4 h-4" />
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => setIsSuccess(false)}
+                                    >
+                                      Stay Here
+                                    </Button>
+                                    <Button
+                                      onClick={handleNext}
+                                      className="gap-2"
+                                    >
+                                      Next Exercise{" "}
+                                      <ChevronRight className="w-4 h-4" />
                                     </Button>
                                   </div>
                                 </motion.div>
@@ -347,20 +440,19 @@ export default function Lab() {
                           ) : (
                             <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-2">
                               <Database className="w-8 h-8 opacity-20" />
-                              <span className="text-sm">Run your query to see results here</span>
+                              <span className="text-sm">
+                                Run your query to see results here
+                              </span>
                             </div>
                           )}
                         </div>
                       </div>
                     </ResizablePanel>
-
                   </ResizablePanelGroup>
                 </ResizablePanel>
-
               </ResizablePanelGroup>
             )}
           </ResizablePanel>
-
         </ResizablePanelGroup>
       </div>
     </div>
@@ -368,7 +460,13 @@ export default function Lab() {
 }
 
 // Helper to make ScrollArea work easily with flex layouts
-function ScrollAreaWrapper({ children, className }: { children: React.ReactNode, className?: string }) {
+function ScrollAreaWrapper({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <div className={`h-full w-full overflow-y-auto ${className}`}>
       {children}
