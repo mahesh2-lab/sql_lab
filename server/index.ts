@@ -2,14 +2,51 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import compression from "compression";
+import helmet from "helmet";
 
 const app = express();
 const httpServer = createServer(app);
+const isProduction = process.env.NODE_ENV === "production";
 
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
   }
+}
+
+// Production middleware
+if (isProduction) {
+  // Enable gzip compression
+  app.use(compression());
+
+  // Security headers (relaxed CSP for Monaco editor)
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            "'unsafe-eval'",
+            "blob:",
+            "https://cdn.jsdelivr.net",
+          ],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+          workerSrc: ["'self'", "blob:"],
+          connectSrc: ["'self'"],
+          imgSrc: ["'self'", "data:", "blob:"],
+          fontSrc: ["'self'", "data:"],
+        },
+      },
+    }),
+  );
+}
+
+// Trust proxy when behind reverse proxy (e.g., nginx, cloud load balancer)
+if (isProduction) {
+  app.set("trust proxy", 1);
 }
 
 app.use(
@@ -21,8 +58,6 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
-
-
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -69,6 +104,10 @@ app.use((req, res, next) => {
     const message = err.message || "Internal Server Error";
 
     console.error("Internal Server Error:", err);
+    res.setHeader(
+      "Content-Security-Policy",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    );
 
     if (res.headersSent) {
       return next(err);

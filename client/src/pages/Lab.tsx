@@ -61,6 +61,8 @@ export default function Lab() {
   const [isRunning, setIsRunning] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [successCountdown, setSuccessCountdown] = useState(false);
+  const autoNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Redirect to last active or first exercise if none selected
   useEffect(() => {
@@ -77,12 +79,55 @@ export default function Lab() {
     setLocation,
   ]);
 
+  // Guard: redirect to first unlocked exercise if user tries to access a locked one via URL
+  useEffect(() => {
+    if (!exercises?.length || loadingList || loadingProgress || !exerciseId)
+      return;
+    const sorted = [...exercises].sort((a, b) => a.order - b.order);
+    const targetIndex = sorted.findIndex((e) => e.id === exerciseId);
+    if (targetIndex <= 0) return; // first exercise is always accessible, or exercise not found
+    const prevExercise = sorted[targetIndex - 1];
+    const isLocked = !progress.completedExerciseIds.includes(prevExercise.id);
+    if (isLocked) {
+      // Find the highest unlocked exercise to redirect to
+      let lastUnlocked = sorted[0];
+      for (let i = 1; i < sorted.length; i++) {
+        if (progress.completedExerciseIds.includes(sorted[i - 1].id)) {
+          lastUnlocked = sorted[i];
+        } else {
+          break;
+        }
+      }
+      setLocation(`/exercise/${lastUnlocked.id}`);
+    }
+  }, [
+    exercises,
+    exerciseId,
+    loadingList,
+    loadingProgress,
+    progress.completedExerciseIds,
+    setLocation,
+  ]);
+
+  // Clean up auto-nav timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoNavTimerRef.current) clearTimeout(autoNavTimerRef.current);
+    };
+  }, []);
+
   // Setup DB when exercise changes
   useEffect(() => {
     if (exercise && db) {
+      // Clear any pending auto-nav timer from previous exercise
+      if (autoNavTimerRef.current) {
+        clearTimeout(autoNavTimerRef.current);
+        autoNavTimerRef.current = null;
+      }
       resetDB(exercise.setupSql);
       setLastActive(exercise.id);
       setIsSuccess(false);
+      setSuccessCountdown(false);
       setResult(null);
       editorRef.current?.setValue("-- Write your SQL query here\n");
       setShowHint(false);
@@ -90,8 +135,52 @@ export default function Lab() {
   }, [exercise, db, resetDB, setLastActive]);
 
   const handleEditorMount = useCallback(
-    (editor: editor.IStandaloneCodeEditor) => {
-      editorRef.current = editor;
+    (editorInstance: editor.IStandaloneCodeEditor, monaco: any) => {
+      editorRef.current = editorInstance;
+
+      // Define custom theme matching the website
+      monaco.editor.defineTheme("sql-lab", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+          { token: "keyword", foreground: "a78bfa", fontStyle: "bold" }, // purple - primary
+          { token: "string", foreground: "4ade80" }, // green - accent
+          { token: "number", foreground: "f59e0b" }, // amber - warning
+          { token: "comment", foreground: "6b7280", fontStyle: "italic" }, // muted gray
+          { token: "operator", foreground: "94a3b8" }, // light gray
+          { token: "identifier", foreground: "e2e8f0" }, // foreground
+          { token: "type", foreground: "7dd3fc" }, // sky blue
+          { token: "delimiter", foreground: "94a3b8" },
+          { token: "predefined", foreground: "c084fc" }, // lighter purple
+        ],
+        colors: {
+          "editor.background": "#030711",
+          "editor.foreground": "#e2e8f0",
+          "editor.lineHighlightBackground": "#0f172a",
+          "editor.selectionBackground": "#6d28d940",
+          "editor.inactiveSelectionBackground": "#6d28d920",
+          "editorCursor.foreground": "#a78bfa",
+          "editorLineNumber.foreground": "#334155",
+          "editorLineNumber.activeForeground": "#94a3b8",
+          "editorIndentGuide.background": "#1e293b",
+          "editorIndentGuide.activeBackground": "#334155",
+          "editor.selectionHighlightBackground": "#6d28d920",
+          "editorBracketMatch.background": "#6d28d930",
+          "editorBracketMatch.border": "#6d28d960",
+          "editorGutter.background": "#030711",
+          "editorWidget.background": "#0f172a",
+          "editorWidget.border": "#1e293b",
+          "editorSuggestWidget.background": "#0f172a",
+          "editorSuggestWidget.border": "#1e293b",
+          "editorSuggestWidget.selectedBackground": "#1e293b",
+          "input.background": "#0f172a",
+          "input.border": "#1e293b",
+          "scrollbarSlider.background": "#1e293b80",
+          "scrollbarSlider.hoverBackground": "#33415580",
+          "scrollbarSlider.activeBackground": "#475569",
+        },
+      });
+      monaco.editor.setTheme("sql-lab");
     },
     [],
   );
@@ -139,12 +228,27 @@ export default function Lab() {
 
     if (passed) {
       setIsSuccess(true);
+      setSuccessCountdown(true);
       markCompleted(exercise.id);
+
+      // Fire confetti immediately
       confetti({
-        particleCount: 100,
-        spread: 70,
+        particleCount: 120,
+        spread: 80,
         origin: { y: 0.6 },
       });
+
+      // Auto-navigate after 1.4s
+      autoNavTimerRef.current = setTimeout(() => {
+        setSuccessCountdown(false);
+        setIsSuccess(false);
+        const sorted = [...exercises!].sort((a, b) => a.order - b.order);
+        const currentIndex = sorted.findIndex((e) => e.id === exercise.id);
+        const next = sorted[currentIndex + 1];
+        if (next) {
+          setLocation(`/exercise/${next.id}`);
+        }
+      }, 1400);
     }
 
     setIsRunning(false);
@@ -308,7 +412,7 @@ export default function Lab() {
                   <ResizablePanelGroup direction="vertical">
                     {/* Code Editor */}
                     <ResizablePanel defaultSize={60} minSize={30}>
-                      <div className="h-full flex flex-col bg-[#1e1e1e]">
+                      <div className="h-full flex flex-col bg-background">
                         <div className="h-10 bg-muted/20 border-b border-border flex items-center justify-between px-4 shrink-0">
                           <span className="text-xs font-mono text-muted-foreground flex items-center gap-2">
                             query.sql
@@ -333,7 +437,7 @@ export default function Lab() {
                           <Editor
                             height="100%"
                             defaultLanguage="sql"
-                            theme="vs-dark"
+                            theme="sql-lab"
                             defaultValue="-- Write your SQL query here\n"
                             onMount={handleEditorMount}
                             options={{
@@ -387,45 +491,58 @@ export default function Lab() {
                         </div>
 
                         <div className="flex-1 overflow-hidden relative">
-                          {/* Success Overlay */}
+                          {/* Success Banner with Progress Bar */}
                           <AnimatePresence>
                             {isSuccess && (
                               <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="absolute inset-0 z-20 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6"
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.2 }}
+                                className="absolute top-0 left-0 right-0 z-20"
                               >
-                                <motion.div
-                                  initial={{ scale: 0.8, y: 20 }}
-                                  animate={{ scale: 1, y: 0 }}
-                                  className="bg-card border border-border p-8 rounded-2xl shadow-2xl max-w-md w-full"
-                                >
-                                  <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500">
-                                    <PartyPopper className="w-8 h-8" />
+                                <div className="bg-green-500/15 border-b border-green-500/30 px-4 py-3 flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center text-green-500">
+                                      <PartyPopper className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <span className="text-sm font-semibold text-green-400">
+                                        Correct!
+                                      </span>
+                                      <span className="text-xs text-muted-foreground ml-2">
+                                        Moving to next exercise...
+                                      </span>
+                                    </div>
                                   </div>
-                                  <h3 className="text-2xl font-bold text-foreground mb-2">
-                                    Great Job!
-                                  </h3>
-                                  <p className="text-muted-foreground mb-6">
-                                    You've solved this query correctly.
-                                  </p>
-                                  <div className="flex justify-center gap-3">
-                                    <Button
-                                      variant="outline"
-                                      onClick={() => setIsSuccess(false)}
-                                    >
-                                      Stay Here
-                                    </Button>
-                                    <Button
-                                      onClick={handleNext}
-                                      className="gap-2"
-                                    >
-                                      Next Exercise{" "}
-                                      <ChevronRight className="w-4 h-4" />
-                                    </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs text-muted-foreground h-7"
+                                    onClick={() => {
+                                      if (autoNavTimerRef.current)
+                                        clearTimeout(autoNavTimerRef.current);
+                                      setSuccessCountdown(false);
+                                      setIsSuccess(false);
+                                    }}
+                                  >
+                                    Stay Here
+                                  </Button>
+                                </div>
+                                {/* Progress bar */}
+                                {successCountdown && (
+                                  <div className="h-1 bg-green-500/10 w-full overflow-hidden">
+                                    <motion.div
+                                      className="h-full bg-green-500"
+                                      initial={{ width: "0%" }}
+                                      animate={{ width: "100%" }}
+                                      transition={{
+                                        duration: 1.4,
+                                        ease: "linear",
+                                      }}
+                                    />
                                   </div>
-                                </motion.div>
+                                )}
                               </motion.div>
                             )}
                           </AnimatePresence>

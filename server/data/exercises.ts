@@ -45,6 +45,7 @@ export const exercisesData: Exercise[] = [
     solutionSql: "SELECT * FROM users;",
     hint: "Use SELECT * to get all columns.",
     order: 1,
+    expectedColumns: ["id", "name", "age", "city", "email"],
   },
   {
     id: 2,
@@ -54,15 +55,18 @@ export const exercisesData: Exercise[] = [
     solutionSql: "SELECT * FROM users WHERE city = 'New York';",
     hint: "Use the WHERE clause.",
     order: 2,
+    expectedColumns: ["id", "name", "age", "city", "email"],
   },
   {
     id: 3,
     title: "Sort by Age",
-    description: "List all users sorted by age in descending order (oldest first).",
+    description:
+      "List all users sorted by age in descending order (oldest first).",
     setupSql: commonSetup,
     solutionSql: "SELECT * FROM users ORDER BY age DESC;",
     hint: "Use ORDER BY and DESC.",
     order: 3,
+    expectedColumns: ["id", "name", "age", "city", "email"],
   },
   {
     id: 4,
@@ -72,59 +76,76 @@ export const exercisesData: Exercise[] = [
     solutionSql: "SELECT COUNT(*) FROM users;",
     hint: "Use the COUNT() aggregate function.",
     order: 4,
+    expectedColumns: ["count"],
   },
   {
     id: 5,
     title: "Specific Columns",
-    description: "Select only the 'name' and 'email' of users who are older than 25.",
+    description:
+      "Select only the 'name' and 'email' of users who are older than 25.",
     setupSql: commonSetup,
     solutionSql: "SELECT name, email FROM users WHERE age > 25;",
     hint: "Specify column names after SELECT.",
     order: 5,
+    expectedColumns: ["name", "email"],
   },
   {
     id: 6,
     title: "Total Orders per User",
-    description: "Find the total amount spent by each user. Return 'user_id' and 'total_amount'.",
+    description:
+      "Find the total amount spent by each user. Return 'user_id' and 'total_amount'.",
     setupSql: commonSetup,
-    solutionSql: "SELECT user_id, SUM(amount) as total_amount FROM orders GROUP BY user_id;",
+    solutionSql:
+      "SELECT user_id, SUM(amount) as total_amount FROM orders GROUP BY user_id;",
     hint: "Use GROUP BY and SUM().",
     order: 6,
+    expectedColumns: ["user_id", "total_amount"],
   },
   {
     id: 7,
     title: "Join Users and Orders",
-    description: "List all orders with the name of the user who made them. Return 'name' (from users) and 'item' (from orders).",
+    description:
+      "List all orders with the name of the user who made them. Return 'name' (from users) and 'item' (from orders).",
     setupSql: commonSetup,
-    solutionSql: "SELECT users.name, orders.item FROM orders JOIN users ON orders.user_id = users.id;",
+    solutionSql:
+      "SELECT users.name, orders.item FROM orders JOIN users ON orders.user_id = users.id;",
     hint: "Use JOIN ... ON ...",
     order: 7,
+    expectedColumns: ["name", "item"],
   },
   {
     id: 8,
     title: "Filter Aggregates (HAVING)",
     description: "Find user_ids that have spent more than 100 in total.",
     setupSql: commonSetup,
-    solutionSql: "SELECT user_id FROM orders GROUP BY user_id HAVING SUM(amount) > 100;",
+    solutionSql:
+      "SELECT user_id FROM orders GROUP BY user_id HAVING SUM(amount) > 100;",
     hint: "Use HAVING after GROUP BY to filter aggregates.",
     order: 8,
+    expectedColumns: ["user_id"],
   },
   {
     id: 9,
     title: "Users Without Orders",
-    description: "Find the names of users who have effectively placed zero orders (they are not in the orders table).",
+    description:
+      "Find the names of users who have effectively placed zero orders (they are not in the orders table).",
     setupSql: commonSetup,
-    solutionSql: "SELECT name FROM users WHERE id NOT IN (SELECT user_id FROM orders);",
+    solutionSql:
+      "SELECT name FROM users WHERE id NOT IN (SELECT user_id FROM orders);",
     hint: "Use NOT IN with a subquery, or LEFT JOIN.",
     order: 9,
+    expectedColumns: ["name"],
   },
   {
     id: 10,
     title: "Complex Challenge",
-    description: "List the name of the user who made the most expensive single order.",
+    description:
+      "List the name of the user who made the most expensive single order.",
     setupSql: commonSetup,
-    solutionSql: "SELECT name FROM users JOIN orders ON users.id = orders.user_id ORDER BY amount DESC LIMIT 1;",
+    solutionSql:
+      "SELECT name FROM users JOIN orders ON users.id = orders.user_id ORDER BY amount DESC LIMIT 1;",
     hint: "Order by amount descending and take the top 1.",
     order: 10,
+    expectedColumns: ["name"],
   },
 ];

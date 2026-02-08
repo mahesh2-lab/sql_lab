@@ -48,7 +48,6 @@ export function usePGlite() {
   }, []);
 
   const executeQuery = useCallback(async (sql: string): Promise<QueryResult> => {
-    console.log("db", db);
 
     if (!db) return { columns: [], rows: [], error: "Database not initialized" };
 

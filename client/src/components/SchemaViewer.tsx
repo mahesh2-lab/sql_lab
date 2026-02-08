@@ -11,15 +11,16 @@ type SchemaTable = {
 };
 
 // Hardcoded for demo - in a real app, this could be parsed from setupSql or fetched via API
-// Based on the typical SQL bolt/zoo schemas often used for learning
+// Matches the schema defined in exercises.ts
 const MOCK_SCHEMA: SchemaTable[] = [
   {
     name: "users",
     columns: [
       { name: "id", type: "integer" },
-      { name: "username", type: "text" },
+      { name: "name", type: "text" },
+      { name: "age", type: "integer" },
+      { name: "city", type: "text" },
       { name: "email", type: "text" },
-      { name: "created_at", type: "timestamp" },
     ]
   },
   {
@@ -27,8 +28,9 @@ const MOCK_SCHEMA: SchemaTable[] = [
     columns: [
       { name: "id", type: "integer" },
       { name: "user_id", type: "integer" },
-      { name: "total", type: "numeric" },
-      { name: "status", type: "text" },
+      { name: "amount", type: "integer" },
+      { name: "item", type: "text" },
+      { name: "order_date", type: "date" },
     ]
   }
 ];
