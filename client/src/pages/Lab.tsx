@@ -23,6 +23,10 @@ import {
   Lightbulb,
   PartyPopper,
   Database,
+  Terminal,
+  FileCode2,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { motion, AnimatePresence } from "framer-motion";
@@ -62,7 +66,10 @@ export default function Lab() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [successCountdown, setSuccessCountdown] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const autoNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleRunRef = useRef<() => void>(() => {});
+  const handleSubmitRef = useRef<() => void>(() => {});
 
   // Redirect to last active or first exercise if none selected
   useEffect(() => {
@@ -138,49 +145,66 @@ export default function Lab() {
     (editorInstance: editor.IStandaloneCodeEditor, monaco: any) => {
       editorRef.current = editorInstance;
 
-      // Define custom theme matching the website
-      monaco.editor.defineTheme("sql-lab", {
+      // Custom modern dark theme — emerald/cyan
+      monaco.editor.defineTheme("sql-lab-purple", {
         base: "vs-dark",
         inherit: true,
         rules: [
-          { token: "keyword", foreground: "a78bfa", fontStyle: "bold" }, // purple - primary
-          { token: "string", foreground: "4ade80" }, // green - accent
-          { token: "number", foreground: "f59e0b" }, // amber - warning
-          { token: "comment", foreground: "6b7280", fontStyle: "italic" }, // muted gray
-          { token: "operator", foreground: "94a3b8" }, // light gray
-          { token: "identifier", foreground: "e2e8f0" }, // foreground
-          { token: "type", foreground: "7dd3fc" }, // sky blue
-          { token: "delimiter", foreground: "94a3b8" },
-          { token: "predefined", foreground: "c084fc" }, // lighter purple
+          { token: "keyword", foreground: "34D399", fontStyle: "bold" },
+          { token: "string", foreground: "4ADE80" },
+          { token: "number", foreground: "FBBF24" },
+          { token: "comment", foreground: "6B7280", fontStyle: "italic" },
+          { token: "operator", foreground: "67E8F9" },
+          { token: "identifier", foreground: "FAFAFA" },
+          { token: "type", foreground: "22D3EE" },
+          { token: "delimiter", foreground: "71717A" },
+          { token: "predefined", foreground: "67E8F9" },
+          { token: "function", foreground: "06B6D4" },
         ],
         colors: {
-          "editor.background": "#030711",
-          "editor.foreground": "#e2e8f0",
-          "editor.lineHighlightBackground": "#0f172a",
-          "editor.selectionBackground": "#6d28d940",
-          "editor.inactiveSelectionBackground": "#6d28d920",
-          "editorCursor.foreground": "#a78bfa",
-          "editorLineNumber.foreground": "#334155",
-          "editorLineNumber.activeForeground": "#94a3b8",
-          "editorIndentGuide.background": "#1e293b",
-          "editorIndentGuide.activeBackground": "#334155",
-          "editor.selectionHighlightBackground": "#6d28d920",
-          "editorBracketMatch.background": "#6d28d930",
-          "editorBracketMatch.border": "#6d28d960",
-          "editorGutter.background": "#030711",
-          "editorWidget.background": "#0f172a",
-          "editorWidget.border": "#1e293b",
-          "editorSuggestWidget.background": "#0f172a",
-          "editorSuggestWidget.border": "#1e293b",
-          "editorSuggestWidget.selectedBackground": "#1e293b",
-          "input.background": "#0f172a",
-          "input.border": "#1e293b",
-          "scrollbarSlider.background": "#1e293b80",
-          "scrollbarSlider.hoverBackground": "#33415580",
-          "scrollbarSlider.activeBackground": "#475569",
+          "editor.background": "#09090B",
+          "editor.foreground": "#FAFAFA",
+          "editor.lineHighlightBackground": "#18181B",
+          "editor.selectionBackground": "#10B98140",
+          "editor.inactiveSelectionBackground": "#10B98120",
+          "editorCursor.foreground": "#10B981",
+          "editorLineNumber.foreground": "#3F3F46",
+          "editorLineNumber.activeForeground": "#10B981",
+          "editorIndentGuide.background": "#18181B",
+          "editorIndentGuide.activeBackground": "#27272A",
+          "editor.selectionHighlightBackground": "#10B98120",
+          "editorBracketMatch.background": "#10B98130",
+          "editorBracketMatch.border": "#10B98160",
+          "editorGutter.background": "#09090B",
+          "editorWidget.background": "#0F0F11",
+          "editorWidget.border": "#27272A",
+          "editorSuggestWidget.background": "#0F0F11",
+          "editorSuggestWidget.border": "#27272A",
+          "editorSuggestWidget.selectedBackground": "#18181B",
+          "input.background": "#0F0F11",
+          "input.border": "#27272A",
+          "scrollbarSlider.background": "#27272A60",
+          "scrollbarSlider.hoverBackground": "#3F3F4680",
+          "scrollbarSlider.activeBackground": "#10B98140",
         },
       });
-      monaco.editor.setTheme("sql-lab");
+      monaco.editor.setTheme("sql-lab-purple");
+
+      // Ctrl+Enter → Run query
+      editorInstance.addCommand(
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+        () => {
+          document.dispatchEvent(new CustomEvent("sql-lab:run"));
+        },
+      );
+
+      // Ctrl+Shift+Enter → Submit answer
+      editorInstance.addCommand(
+        monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter,
+        () => {
+          document.dispatchEvent(new CustomEvent("sql-lab:submit"));
+        },
+      );
     },
     [],
   );
@@ -190,7 +214,7 @@ export default function Lab() {
   }, []);
 
   const resetCode = useCallback(() => {
-    editorRef.current?.setValue("-- Write your SQL  here\n");
+    editorRef.current?.setValue("-- Write your SQL query here\n");
   }, []);
 
   const handleRun = async () => {
@@ -227,28 +251,35 @@ export default function Lab() {
     });
 
     if (passed) {
+      setIsRunning(false);
       setIsSuccess(true);
       setSuccessCountdown(true);
-      markCompleted(exercise.id);
+      await markCompleted(exercise.id);
 
       // Fire confetti immediately
       confetti({
         particleCount: 120,
         spread: 80,
         origin: { y: 0.6 },
+        colors: ["#10B981", "#06B6D4", "#34D399", "#22D3EE"],
       });
 
       // Auto-navigate after 1.4s
+      const sortedExercises = [...exercises!].sort((a, b) => a.order - b.order);
+      const currentIndex = sortedExercises.findIndex(
+        (e) => e.id === exercise.id,
+      );
+      const next = sortedExercises[currentIndex + 1];
+
       autoNavTimerRef.current = setTimeout(() => {
         setSuccessCountdown(false);
         setIsSuccess(false);
-        const sorted = [...exercises!].sort((a, b) => a.order - b.order);
-        const currentIndex = sorted.findIndex((e) => e.id === exercise.id);
-        const next = sorted[currentIndex + 1];
         if (next) {
           setLocation(`/exercise/${next.id}`);
         }
       }, 1400);
+
+      return;
     }
 
     setIsRunning(false);
@@ -264,13 +295,37 @@ export default function Lab() {
     }
   };
 
+  // Keep refs in sync with latest handler closures
+  handleRunRef.current = handleRun;
+  handleSubmitRef.current = handleSubmit;
+
+  // Listen for keyboard shortcut events dispatched from Monaco
+  useEffect(() => {
+    const onRun = () => handleRunRef.current();
+    const onSubmit = () => handleSubmitRef.current();
+    document.addEventListener("sql-lab:run", onRun);
+    document.addEventListener("sql-lab:submit", onSubmit);
+    return () => {
+      document.removeEventListener("sql-lab:run", onRun);
+      document.removeEventListener("sql-lab:submit", onSubmit);
+    };
+  }, []);
+
   console.log(loadingList, loadingDB, loadingProgress);
 
   if (loadingList || loadingDB) {
     return (
-      <div className="h-screen w-full bg-background flex flex-col items-center justify-center gap-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <p className="text-muted-foreground font-mono animate-pulse">
+      <div
+        className="h-screen w-full flex flex-col items-center justify-center gap-4"
+        style={{
+          background: "linear-gradient(180deg, #09090B 0%, #0F0F11 100%)",
+        }}
+      >
+        <div className="relative">
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-transparent border-t-primary border-r-primary/50" />
+          <div className="absolute inset-0 rounded-full animate-pulse-glow" />
+        </div>
+        <p className="text-muted-foreground font-mono text-sm animate-pulse">
           Initializing SQL Engine...
         </p>
       </div>
@@ -280,105 +335,186 @@ export default function Lab() {
   if (!exercises) return null;
 
   return (
-    <div className="h-screen w-full bg-background flex flex-col overflow-hidden">
-      {/* Header */}
-      <header className="h-14 border-b border-border bg-card/50 flex items-center justify-between px-4 shrink-0">
+    <div
+      className="h-screen w-full flex flex-col overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(135deg, #09090B 0%, #0F0F11 50%, #09090B 100%)",
+      }}
+    >
+      {/* ── VS Code–style Header ── */}
+      <header className="h-12 border-b border-border/60 flex items-center justify-between px-3 shrink-0 glass">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center text-primary font-bold font-display text-lg">
-            SQL
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="hidden md:flex w-8 h-8 rounded-md items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all duration-200"
+          >
+            {sidebarCollapsed ? (
+              <PanelLeft className="w-4 h-4" />
+            ) : (
+              <PanelLeftClose className="w-4 h-4" />
+            )}
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center glow-sm">
+              <Terminal className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-display font-bold text-sm tracking-tight text-foreground hidden sm:block">
+              SQL Lab
+            </span>
           </div>
-          <h1 className="font-display font-bold text-lg hidden md:block">
-            Postgres Lab
-          </h1>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-muted-foreground mr-4 hidden sm:block">
-            {progress.completedExerciseIds.length} / {exercises.length}{" "}
-            Completed
+        {/* Center: Tab-like active file indicator */}
+        <div className="flex items-center">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-t-md bg-background/80 border border-border/40 border-b-transparent -mb-[1px] relative z-10">
+            <FileCode2 className="w-3.5 h-3.5 text-primary" />
+            <span className="text-xs font-mono text-foreground/90">
+              query.sql
+            </span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setLocation("/")}>
-            All Exercises
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-muted-foreground font-mono hidden sm:flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            {progress.completedExerciseIds.length}/{exercises.length} done
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocation("/")}
+            className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40"
+          >
+            Home
           </Button>
         </div>
       </header>
 
+      {/* ── Main Layout ── */}
       <div className="flex-1 flex overflow-hidden">
         <ResizablePanelGroup direction="horizontal">
-          {/* Sidebar */}
-          <ResizablePanel
-            defaultSize={20}
-            minSize={15}
-            maxSize={30}
-            className="hidden md:block bg-muted/10 border-r border-border"
-          >
-            <div className="h-full flex flex-col">
-              <div className="p-4 border-b border-border bg-card/50">
-                <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
-                  Curriculum
-                </h2>
-              </div>
-              <ScrollAreaWrapper>
-                <ExerciseList
-                  exercises={exercises}
-                  completedIds={progress.completedExerciseIds}
-                  currentId={exerciseId}
-                />
-              </ScrollAreaWrapper>
-            </div>
-          </ResizablePanel>
+          {/* ── Left Sidebar: Explorer ── */}
+          {!sidebarCollapsed && (
+            <>
+              <ResizablePanel
+                defaultSize={18}
+                minSize={14}
+                maxSize={28}
+                className="hidden md:block"
+              >
+                <div
+                  className="h-full flex flex-col"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, #0F0F11 0%, #09090B 100%)",
+                  }}
+                >
+                  {/* Sidebar Header */}
+                  <div className="px-4 py-3 border-b border-border/40">
+                    <h2 className="font-display font-semibold text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+                      Explorer
+                    </h2>
+                  </div>
 
-          <ResizableHandle className="hidden md:flex" />
+                  {/* Exercise List */}
+                  <ScrollAreaWrapper>
+                    <ExerciseList
+                      exercises={exercises}
+                      completedIds={progress.completedExerciseIds}
+                      currentId={exerciseId}
+                    />
+                  </ScrollAreaWrapper>
 
-          {/* Main Content */}
-          <ResizablePanel defaultSize={80}>
+                  {/* Sidebar Footer: Progress Bar */}
+                  <div className="px-4 py-3 border-t border-border/40">
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
+                      <span>Progress</span>
+                      <span className="font-mono">
+                        {Math.round(
+                          (progress.completedExerciseIds.length /
+                            exercises.length) *
+                            100,
+                        )}
+                        %
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500 ease-out"
+                        style={{
+                          width: `${(progress.completedExerciseIds.length / exercises.length) * 100}%`,
+                          background:
+                            "linear-gradient(90deg, #10B981, #06B6D4)",
+                          boxShadow: "0 0 8px #10B98140",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </ResizablePanel>
+              <ResizableHandle className="hidden md:flex w-[1px] bg-border/40 hover:bg-primary/40 transition-colors duration-200" />
+            </>
+          )}
+
+          {/* ── Main Content Panel ── */}
+          <ResizablePanel defaultSize={sidebarCollapsed ? 100 : 82}>
             {loadingExercise || !exercise ? (
-              <div className="h-full w-full p-8 space-y-4">
-                <Skeleton className="h-12 w-3/4" />
-                <Skeleton className="h-64 w-full" />
+              <div
+                className="h-full w-full p-8 space-y-4"
+                style={{ background: "#09090B" }}
+              >
+                <Skeleton className="h-8 w-3/4 bg-muted/30" />
+                <Skeleton className="h-4 w-1/2 bg-muted/20" />
+                <Skeleton className="h-64 w-full bg-muted/20" />
               </div>
             ) : (
               <ResizablePanelGroup direction="horizontal">
-                {/* Exercise Description & Schema */}
-                <ResizablePanel defaultSize={40} minSize={30}>
-                  <ScrollAreaWrapper className="bg-card/30">
-                    <div className="p-6 max-w-2xl mx-auto space-y-8">
-                      <div>
-                        <div className="flex items-center gap-3 mb-4">
-                          <Badge
-                            variant="outline"
-                            className="bg-primary/5 border-primary/20 text-primary font-mono"
-                          >
-                            Exercise {exercise.order}
+                {/* ── Exercise Description & Schema ── */}
+                <ResizablePanel defaultSize={38} minSize={25}>
+                  <ScrollAreaWrapper
+                    className=""
+                    style={{
+                      background:
+                        "linear-gradient(180deg, #0F0F11 0%, #09090B 100%)",
+                    }}
+                  >
+                    <div className="p-6 max-w-2xl mx-auto space-y-6">
+                      {/* Exercise Header */}
+                      <div className="animate-fade-in-up">
+                        <div className="flex items-center gap-2.5 mb-3">
+                          <Badge className="bg-primary/10 text-primary border border-primary/20 font-mono text-[11px] px-2 py-0.5 rounded-md">
+                            #{exercise.order}
                           </Badge>
                           {progress.completedExerciseIds.includes(
                             exercise.id,
                           ) && (
-                            <Badge
-                              variant="default"
-                              className="bg-green-600 hover:bg-green-700"
-                            >
+                            <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] px-2 py-0.5 rounded-md">
+                              <Check className="w-3 h-3 mr-1" />
                               Completed
                             </Badge>
                           )}
                         </div>
-                        <h1 className="text-3xl font-display font-bold mb-4 text-foreground">
+
+                        <h1 className="text-2xl font-display font-bold text-foreground leading-tight mb-3">
                           {exercise.title}
                         </h1>
-                        <div className="prose prose-invert prose-sm max-w-none text-muted-foreground">
+
+                        <div className="text-sm text-muted-foreground leading-relaxed">
                           <p>{exercise.description}</p>
                         </div>
                       </div>
 
+                      {/* Hint Section */}
                       {exercise.hint && (
-                        <div className="pt-4 border-t border-border">
+                        <div className="border-t border-border/30 pt-4">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setShowHint(!showHint)}
-                            className="text-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+                            className="text-amber-400/80 hover:text-amber-300 hover:bg-amber-500/10 h-8 text-xs gap-1.5 rounded-md transition-all duration-200"
                           >
-                            <Lightbulb className="w-4 h-4 mr-2" />
+                            <Lightbulb className="w-3.5 h-3.5" />
                             {showHint ? "Hide Hint" : "Show Hint"}
                           </Button>
                           <AnimatePresence>
@@ -387,9 +523,10 @@ export default function Lab() {
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: "auto", opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: "easeOut" }}
                                 className="overflow-hidden"
                               >
-                                <div className="mt-2 p-4 bg-amber-500/10 border border-amber-500/20 rounded-md text-sm text-amber-200/80 italic">
+                                <div className="mt-2 p-3 bg-amber-500/5 border border-amber-500/15 rounded-lg text-sm text-amber-200/70 italic font-mono leading-relaxed">
                                   {exercise.hint}
                                 </div>
                               </motion.div>
@@ -398,127 +535,207 @@ export default function Lab() {
                         </div>
                       )}
 
-                      <div className="pt-8 border-t border-border">
+                      {/* Schema Viewer */}
+                      <div className="border-t border-border/30 pt-6">
                         <SchemaViewer />
+                      </div>
+
+                      {/* Navigation */}
+                      <div className="border-t border-border/30 pt-4 flex items-center gap-2">
+                        {exercise.order > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const sorted = [...exercises].sort(
+                                (a, b) => a.order - b.order,
+                              );
+                              const idx = sorted.findIndex(
+                                (e) => e.id === exercise.id,
+                              );
+                              if (idx > 0)
+                                setLocation(`/exercise/${sorted[idx - 1].id}`);
+                            }}
+                            className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                            Previous
+                          </Button>
+                        )}
+                        <div className="flex-1" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleNext}
+                          className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1"
+                        >
+                          Next
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
                     </div>
                   </ScrollAreaWrapper>
                 </ResizablePanel>
 
-                <ResizableHandle />
+                <ResizableHandle className="w-[1px] bg-border/40 hover:bg-primary/40 transition-colors duration-200" />
 
-                {/* Editor & Results */}
-                <ResizablePanel defaultSize={60}>
+                {/* ── Editor & Results ── */}
+                <ResizablePanel defaultSize={62}>
                   <ResizablePanelGroup direction="vertical">
-                    {/* Code Editor */}
+                    {/* ── Code Editor Panel ── */}
                     <ResizablePanel defaultSize={60} minSize={30}>
-                      <div className="h-full flex flex-col bg-background">
-                        <div className="h-10 bg-muted/20 border-b border-border flex items-center justify-between px-4 shrink-0">
-                          <span className="text-xs font-mono text-muted-foreground flex items-center gap-2">
-                            query.sql
-                          </span>
+                      <div
+                        className="h-full flex flex-col"
+                        style={{ background: "#09090B" }}
+                      >
+                        {/* Editor Tab Bar */}
+                        <div
+                          className="h-9 border-b border-border/40 flex items-center justify-between px-3 shrink-0"
+                          style={{ background: "#0F0F11" }}
+                        >
                           <div className="flex items-center gap-2">
+                            <FileCode2 className="w-3.5 h-3.5 text-primary" />
+                            <span className="text-[11px] font-mono text-muted-foreground">
+                              query.sql
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="h-7 w-7 p-0"
+                                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/40"
                                   onClick={resetCode}
                                 >
-                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  <RotateCcw className="w-3 h-3" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Reset Code</TooltipContent>
+                              <TooltipContent side="bottom" className="text-xs">
+                                Reset Code
+                              </TooltipContent>
                             </Tooltip>
                           </div>
                         </div>
+
+                        {/* Monaco Editor */}
                         <div className="flex-1 relative">
                           <Editor
                             height="100%"
                             defaultLanguage="sql"
-                            theme="sql-lab"
+                            theme="sql-lab-purple"
                             defaultValue="-- Write your SQL query here\n"
                             onMount={handleEditorMount}
                             options={{
                               minimap: { enabled: false },
                               fontSize: 14,
-                              fontFamily: "'JetBrains Mono', monospace",
+                              fontFamily:
+                                "'JetBrains Mono', 'Fira Code', monospace",
+                              fontLigatures: true,
                               padding: { top: 16 },
                               scrollBeyondLastLine: false,
                               automaticLayout: true,
+                              cursorBlinking: "smooth",
+                              cursorSmoothCaretAnimation: "on",
+                              smoothScrolling: true,
+                              renderLineHighlight: "all",
+                              lineHeight: 22,
+                              letterSpacing: 0.3,
                             }}
                           />
                         </div>
-                        <div className="h-14 border-t border-border bg-card p-2 flex items-center justify-end gap-2 px-4">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleRun}
-                            disabled={isRunning}
-                          >
-                            <Play className="w-4 h-4 mr-2 text-muted-foreground" />{" "}
-                            Run
-                          </Button>
-                          <Button
-                            onClick={handleSubmit}
-                            disabled={isRunning}
-                            className="bg-primary hover:bg-primary/90 text-white shadow-[0_0_20px_rgba(124,58,237,0.3)]"
-                          >
-                            {isRunning ? (
-                              <span className="animate-spin mr-2">⏳</span>
-                            ) : (
-                              <Check className="w-4 h-4 mr-2" />
-                            )}
+
+                        {/* Action Bar */}
+                        <div
+                          className="h-12 border-t border-border/40 p-2 flex items-center justify-between px-3"
+                          style={{ background: "#0F0F11" }}
+                        >
+                          <div className="text-[11px] text-muted-foreground/80 font-mono hidden sm:block">
+                            Ctrl+Enter = Run &nbsp;•&nbsp; Ctrl+Shift+Enter =
                             Submit
-                          </Button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleRun}
+                              disabled={isRunning}
+                              className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 gap-1.5 rounded-md transition-all duration-200"
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                              Run
+                            </Button>
+                            <Button
+                              onClick={handleSubmit}
+                              disabled={isRunning}
+                              className="h-8 px-4 text-xs font-medium rounded-md btn-glow text-white gap-1.5 transition-all duration-200"
+                            >
+                              {isRunning ? (
+                                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              ) : (
+                                <Check className="w-3.5 h-3.5" />
+                              )}
+                              Submit
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </ResizablePanel>
 
-                    <ResizableHandle />
+                    <ResizableHandle className="h-[1px] bg-border/40 hover:bg-primary/40 transition-colors duration-200" />
 
-                    {/* Results Panel */}
-                    <ResizablePanel defaultSize={40} minSize={20}>
-                      <div className="h-full flex flex-col bg-background relative">
-                        <div className="h-9 border-b border-border bg-muted/30 flex items-center px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0 justify-between">
-                          <span>Results</span>
+                    {/* ── Results Panel ── */}
+                    <ResizablePanel defaultSize={40} minSize={15}>
+                      <div
+                        className="h-full flex flex-col relative"
+                        style={{ background: "#09090B" }}
+                      >
+                        {/* Results Header */}
+                        <div
+                          className="h-8 border-b border-border/60 flex items-center px-3 text-[11px] font-mono text-muted-foreground uppercase tracking-wider shrink-0 justify-between"
+                          style={{ background: "#0F0F11" }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Terminal className="w-3 h-3 text-primary/80" />
+                            <span>Output</span>
+                          </div>
                           {result?.rows && (
-                            <span className="font-mono">
-                              {result.rows.length} rows
+                            <span className="text-primary font-mono normal-case">
+                              {result.rows.length} row
+                              {result.rows.length !== 1 ? "s" : ""}
                             </span>
                           )}
                         </div>
 
                         <div className="flex-1 overflow-hidden relative">
-                          {/* Success Banner with Progress Bar */}
+                          {/* Success Banner */}
                           <AnimatePresence>
                             {isSuccess && (
                               <motion.div
                                 initial={{ opacity: 0, y: -20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.2 }}
+                                transition={{ duration: 0.2, ease: "easeOut" }}
                                 className="absolute top-0 left-0 right-0 z-20"
                               >
-                                <div className="bg-green-500/15 border-b border-green-500/30 px-4 py-3 flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center text-green-500">
-                                      <PartyPopper className="w-4 h-4" />
+                                <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-4 py-2.5 flex items-center justify-between backdrop-blur-sm">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-7 h-7 bg-emerald-500/15 rounded-full flex items-center justify-center text-emerald-400">
+                                      <PartyPopper className="w-3.5 h-3.5" />
                                     </div>
                                     <div>
-                                      <span className="text-sm font-semibold text-green-400">
+                                      <span className="text-sm font-semibold text-emerald-400">
                                         Correct!
                                       </span>
                                       <span className="text-xs text-muted-foreground ml-2">
-                                        Moving to next exercise...
+                                        Moving to next...
                                       </span>
                                     </div>
                                   </div>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="text-xs text-muted-foreground h-7"
+                                    className="text-[11px] text-muted-foreground h-6 hover:text-foreground"
                                     onClick={() => {
                                       if (autoNavTimerRef.current)
                                         clearTimeout(autoNavTimerRef.current);
@@ -529,11 +746,14 @@ export default function Lab() {
                                     Stay Here
                                   </Button>
                                 </div>
-                                {/* Progress bar */}
                                 {successCountdown && (
-                                  <div className="h-1 bg-green-500/10 w-full overflow-hidden">
+                                  <div className="h-0.5 bg-emerald-500/10 w-full overflow-hidden">
                                     <motion.div
-                                      className="h-full bg-green-500"
+                                      className="h-full"
+                                      style={{
+                                        background:
+                                          "linear-gradient(90deg, #10B981, #06B6D4)",
+                                      }}
                                       initial={{ width: "0%" }}
                                       animate={{ width: "100%" }}
                                       transition={{
@@ -555,10 +775,10 @@ export default function Lab() {
                               affectedRows={result.affectedRows}
                             />
                           ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-2">
-                              <Database className="w-8 h-8 opacity-20" />
-                              <span className="text-sm">
-                                Run your query to see results here
+                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/60 gap-2">
+                              <Database className="w-6 h-6" />
+                              <span className="text-xs font-mono">
+                                Run your query to see results
                               </span>
                             </div>
                           )}
@@ -580,12 +800,17 @@ export default function Lab() {
 function ScrollAreaWrapper({
   children,
   className,
+  style,
 }: {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   return (
-    <div className={`h-full w-full overflow-y-auto ${className}`}>
+    <div
+      className={`h-full w-full overflow-y-auto ${className || ""}`}
+      style={style}
+    >
       {children}
     </div>
   );

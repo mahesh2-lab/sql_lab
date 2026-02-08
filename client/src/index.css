@@ -1,80 +1,137 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* Dark/Hacker Theme Palette */
-  --font-sans: 'Inter', sans-serif;
-  --font-display: 'Space Grotesk', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+@layer base {
+  /* Modern dark theme — emerald + cyan on neutral blacks */
+  :root {
+    --background: 240 6% 4%; /* #09090B */
+    --foreground: 0 0% 98%; /* #FAFAFA */
+    --card: 240 4% 7%; /* #111113 */
+    --card-foreground: 0 0% 98%;
+    --popover: 240 4% 10%; /* #18181B */
+    --popover-foreground: 0 0% 98%;
+    --primary: 160 84% 39%; /* #10B981 emerald */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 187 86% 53%; /* #06B6D4 cyan */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 14%; /* neutral muted surface */
+    --muted-foreground: 240 5% 65%; /* neutral gray text */
+    --accent: 160 60% 45%; /* teal accent */
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 72% 50%;
+    --warning: 38 92% 50%;
+    --border: 240 4% 20%; /* neutral zinc border */
+    --input: 240 4% 16%;
+    --ring: 160 84% 39%;
+    --radius: 0.75rem;
 
-  /* HSL Values */
-  --background: 224 71% 4%;
-  --foreground: 213 31% 91%;
-  
-  --primary: 263 70% 50%;
-  --primary-foreground: 210 40% 98%;
-  
-  --secondary: 222 47% 11%;
-  --secondary-foreground: 210 40% 98%;
-  
-  --muted: 223 47% 11%;
-  --muted-foreground: 215 20% 65%;
-  
-  --accent: 142 71% 45%;
-  --accent-foreground: 144 70% 5%;
-  
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
-  
-  --border: 216 34% 17%;
-  --input: 216 34% 17%;
-  --ring: 263 70% 50%;
-  
-  --success: 142 76% 36%;
-  --warning: 45 93% 47%;
+    /* Sidebar tokens */
+    --sidebar: 240 5% 6%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-border: 240 4% 20%;
+    --sidebar-ring: 160 84% 39%;
+    --sidebar-primary: 160 84% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 4% 14%;
+    --sidebar-accent-foreground: 0 0% 98%;
+
+    /* Font stacks */
+    --font-sans: "Inter", "Space Grotesk", system-ui, -apple-system, sans-serif;
+    --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+    --font-display: "Space Grotesk", "Inter", sans-serif;
+  }
 }
 
 @layer base {
+  * {
+    @apply border-border;
+  }
   body {
-    @apply bg-background text-foreground antialiased selection:bg-primary/30;
+    @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
-    @apply tracking-tight;
-  }
-
-  code, pre, .monaco-editor {
-    font-family: var(--font-mono) !important;
-  }
-}
-
-@layer components {
-  /* Custom Scrollbar for dark theme */
+  /* Custom scrollbar — thin, neutral-tinted */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 6px;
   }
-  
   ::-webkit-scrollbar-track {
-    @apply bg-muted;
+    background: transparent;
   }
-  
   ::-webkit-scrollbar-thumb {
-    @apply bg-border rounded-full hover:bg-muted-foreground/50 transition-colors;
-    border: 2px solid hsl(var(--muted));
+    background: hsl(240 4% 24%);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(240 4% 34%);
   }
 
-  .glass-panel {
-    @apply bg-background/95 backdrop-blur-sm border border-border shadow-2xl;
+  /* Selection color */
+  ::selection {
+    background: hsl(160 84% 39% / 0.3);
+    color: #fafafa;
   }
 }
 
-/* Monaco Editor Overrides */
-.monaco-editor .margin {
-  background-color: hsl(var(--background)) !important;
+@layer utilities {
+  /* Glassmorphism utility */
+  .glass {
+    background: hsl(240 4% 7% / 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(240 4% 20% / 0.5);
+  }
+
+  /* Gradient glow button */
+  .btn-glow {
+    background: linear-gradient(135deg, hsl(160 84% 39%), hsl(187 86% 53%));
+    box-shadow:
+      0 0 20px hsl(160 84% 39% / 0.3),
+      0 0 60px hsl(160 84% 39% / 0.1);
+    transition: all 200ms ease-out;
+  }
+  .btn-glow:hover {
+    box-shadow:
+      0 0 30px hsl(160 84% 39% / 0.5),
+      0 0 80px hsl(160 84% 39% / 0.15);
+    transform: translateY(-1px);
+  }
+
+  /* Accent bar for active sidebar items */
+  .active-accent-bar {
+    position: relative;
+  }
+  .active-accent-bar::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 3px;
+    border-radius: 0 4px 4px 0;
+    background: linear-gradient(180deg, hsl(160 84% 39%), hsl(187 86% 53%));
+    box-shadow: 0 0 8px hsl(160 84% 39% / 0.6);
+  }
+
+  /* Subtle glow for active elements */
+  .glow-sm {
+    box-shadow: 0 0 12px hsl(160 84% 39% / 0.15);
+  }
+  .glow-md {
+    box-shadow: 0 0 24px hsl(160 84% 39% / 0.2);
+  }
+  .glow-lg {
+    box-shadow: 0 0 40px hsl(160 84% 39% / 0.25);
+  }
+
+  /* Zebra stripe for result tables */
+  .zebra-row:nth-child(even) {
+    background: hsl(240 4% 8% / 0.5);
+  }
 }
